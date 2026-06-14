@@ -1,0 +1,4 @@
+# Python 依赖
+anthropic>=0.40.0     # Claude API（主要）
+openai>=1.50.0        # GPT API（备选）
+pyyaml>=6.0           # 配置文件解析

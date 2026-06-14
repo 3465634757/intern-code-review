@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# run.sh - 本地一键运行周度代码审查
+#
+# 用法:
+#   ./run.sh                    # 审查所有实习生（本周）
+#   ./run.sh --intern "张三"     # 只审查指定实习生
+#   ./run.sh --week 2026-W24    # 指定周次
+#   ./run.sh --dry-run          # 试运行（只收集数据，不调用AI）
+#
+# 前置条件:
+#   1. pip install -r requirements.txt
+#   2. 设置环境变量 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
+#   3. 根据实际情况修改 config/interns.yml 中的仓库路径
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# 解析参数
+INTERN=""
+WEEK=""
+DRY_RUN=""
+REPO_BASE=""  # 仓库本地路径前缀，如 /home/dev/repos
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --intern) INTERN="$2"; shift 2 ;;
+        --week) WEEK="$2"; shift 2 ;;
+        --dry-run) DRY_RUN="--dry-run"; shift ;;
+        --repo-base) REPO_BASE="$2"; shift 2 ;;
+        *) echo "未知参数: $1"; exit 1 ;;
+    esac
+done
+
+# 确定周次
+if [ -z "$WEEK" ]; then
+    WEEK=$(date +%Y-W%V)
+fi
+echo "📅 审查周: $WEEK"
+
+# 确定日期范围
+YEAR=$(echo "$WEEK" | cut -d- -f1)
+WEEK_NUM=$(echo "$WEEK" | grep -oP 'W\K\d+')
+SINCE=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d 2>/dev/null || echo "")
+echo "📅 起始日期: $SINCE"
+
+# 创建输出目录
+OUTPUT_DIR="reports/$WEEK"
+mkdir -p "$OUTPUT_DIR"
+
+# 解析 interns.yml 获取实习生列表
+# 简易解析（完整版建议用 yq 或 python）
+if [ -n "$INTERN" ]; then
+    # 只审查指定实习生
+    INTERNS=("$INTERN")
+else
+    # 从配置文件读取所有实习生姓名
+    INTERNS=$(grep '^\s*-\s*name:' config/interns.yml | sed 's/.*name:\s*"//;s/".*//' | tr -d ' ')
+fi
+
+TOTAL=0
+SUCCESS=0
+FAILED=0
+
+for NAME in $INTERNS; do
+    TOTAL=$((TOTAL + 1))
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "👤 [$TOTAL] 审查: $NAME"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # 从配置文件获取岗位
+    ROLE=$(grep -A5 "\"$NAME\"" config/interns.yml | grep 'role:' | head -1 | sed 's/.*role:\s*"//;s/".*//' | tr -d ' ')
+
+    if [ -z "$ROLE" ]; then
+        echo "  ❌ 未找到 $NAME 的岗位配置"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+
+    OUTPUT_FILE="$OUTPUT_DIR/${ROLE}-${NAME}.md"
+
+    # 构建命令
+    CMD="python scripts/generate-report.py"
+    CMD="$CMD --config config/interns.yml"
+    CMD="$CMD --intern \"$NAME\""
+    CMD="$CMD --week \"$WEEK\""
+    CMD="$CMD --output \"$OUTPUT_FILE\""
+
+    if [ -n "$DRY_RUN" ]; then
+        CMD="$CMD --dry-run"
+    fi
+
+    if [ -n "$REPO_BASE" ]; then
+        CMD="$CMD --repo-base \"$REPO_BASE\""
+    fi
+
+    # 执行
+    if eval $CMD; then
+        SUCCESS=$((SUCCESS + 1))
+        echo "  ✅ $NAME 审查完成"
+    else
+        FAILED=$((FAILED + 1))
+        echo "  ❌ $NAME 审查失败"
+    fi
+done
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 审查完成"
+echo "  总计: $TOTAL | 成功: $SUCCESS | 失败: $FAILED"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# 汇总
+if [ -z "$DRY_RUN" ] && [ $SUCCESS -gt 0 ]; then
+    echo ""
+    echo "📈 正在生成汇总报告..."
+    python scripts/aggregate-scores.py --reports-dir "$OUTPUT_DIR" --history
+    echo ""
+    echo "📁 报告目录: $OUTPUT_DIR/"
+    ls -la "$OUTPUT_DIR/"
+fi

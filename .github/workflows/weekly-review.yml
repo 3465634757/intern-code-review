@@ -1,0 +1,230 @@
+name: 实习生周度代码审查
+
+on:
+  schedule:
+    # 每周五下午5点(UTC+8) = 每周五 09:00 UTC
+    - cron: '0 9 * * 5'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: '审查周（格式: 2026-W24，留空则自动取本周）'
+        required: false
+        type: string
+      dry_run:
+        description: '试运行（只收集数据，不调用AI）'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REPORTS_BASE: reports
+
+jobs:
+  generate-reports:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 从 interns.yml 中读取实习生列表
+        # 实际使用时需要动态生成，这里用示例数据
+        intern:
+          - name: "张三"
+            role: "frontend"
+            github_id: "zhangsan-dev"
+          - name: "李四"
+            role: "backend"
+            github_id: "lisi-dev"
+          - name: "王五"
+            role: "qa"
+            github_id: "wangwu-dev"
+          - name: "赵六"
+            role: "mobile"
+            github_id: "zhaoliu-dev"
+          - name: "钱七"
+            role: "devops"
+            github_id: "qianqi-dev"
+          - name: "孙八"
+            role: "data"
+            github_id: "sunba-dev"
+      # 防止同时太多请求打爆 API
+      max-parallel: 3
+      fail-fast: false
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Python 依赖
+        run: pip install pyyaml anthropic
+
+      - name: 确定审查周
+        id: week
+        run: |
+          if [ -n "${{ inputs.week }}" ]; then
+            echo "week=${{ inputs.week }}" >> $GITHUB_OUTPUT
+          else
+            WEEK=$(date +%Y-W%V)
+            echo "week=$WEEK" >> $GITHUB_OUTPUT
+          fi
+          # 计算本周一日期
+          MONDAY=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d)
+          echo "since=$MONDAY" >> $GITHUB_OUTPUT
+
+      - name: 收集本周提交
+        id: commits
+        run: |
+          AUTHOR="${{ matrix.intern.github_id }}"
+          SINCE="${{ steps.week.outputs.since }}"
+
+          COMMITS=$(git log \
+            --author="$AUTHOR" \
+            --since="$SINCE" \
+            --pretty=format:"%h|%s|%ai|%an" \
+            --no-merges 2>/dev/null || echo "")
+
+          DIFF=$(git log \
+            --author="$AUTHOR" \
+            --since="$SINCE" \
+            --no-merges \
+            -p --stat 2>/dev/null || echo "")
+
+          # 保存到文件（避免环境变量溢出）
+          mkdir -p /tmp/intern-review
+          echo "$COMMITS" > /tmp/intern-review/commits.txt
+          echo "$DIFF" > /tmp/intern-review/diff.txt
+
+          COMMIT_COUNT=$(echo "$COMMITS" | grep -c '|' || echo "0")
+          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          echo "📋 ${{ matrix.intern.name }} 本周提交: $COMMIT_COUNT 条"
+
+      - name: 生成评审报告
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        if: inputs.dry_run != true
+        run: |
+          WEEK="${{ steps.week.outputs.week }}"
+          NAME="${{ matrix.intern.name }}"
+          ROLE="${{ matrix.intern.role }}"
+          OUTPUT_DIR="${{ env.REPORTS_BASE }}/$WEEK"
+          OUTPUT_FILE="$OUTPUT_DIR/${ROLE}-${NAME}.md"
+
+          mkdir -p "$OUTPUT_DIR"
+
+          python scripts/generate-report.py \
+            --config config/interns.yml \
+            --intern "$NAME" \
+            --week "$WEEK" \
+            --commits-file /tmp/intern-review/commits.txt \
+            --diff-file /tmp/intern-review/diff.txt \
+            --output "$OUTPUT_FILE"
+
+          echo "✅ 报告已生成: $OUTPUT_FILE"
+
+      - name: 试运行模式（只输出prompt）
+        if: inputs.dry_run == true
+        run: |
+          WEEK="${{ steps.week.outputs.week }}"
+          NAME="${{ matrix.intern.name }}"
+
+          python scripts/generate-report.py \
+            --intern "$NAME" \
+            --week "$WEEK" \
+            --commits-file /tmp/intern-review/commits.txt \
+            --diff-file /tmp/intern-review/diff.txt \
+            --dry-run
+
+      - name: 上传单人报告
+        uses: actions/upload-artifact@v4
+        if: inputs.dry_run != true
+        with:
+          name: report-${{ matrix.intern.name }}-${{ steps.week.outputs.week }}
+          path: ${{ env.REPORTS_BASE }}/${{ steps.week.outputs.week }}/
+          retention-days: 90
+
+  # 汇总所有报告
+  aggregate:
+    needs: generate-reports
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: pip install pyyaml
+
+      - name: 下载所有报告
+        uses: actions/download-artifact@v4
+        with:
+          path: reports/
+          pattern: report-*
+          merge-multiple: false
+
+      - name: 整理报告目录
+        run: |
+          # 将下载的 artifact 整理到正确目录结构
+          WEEK=$(date +%Y-W%V)
+          mkdir -p reports/$WEEK
+          for dir in reports/report-*/; do
+            cp "$dir"*.md reports/$WEEK/ 2>/dev/null || true
+          done
+          ls -la reports/$WEEK/
+
+      - name: 汇总分数
+        run: |
+          python scripts/aggregate-scores.py \
+            --reports-dir reports/$(date +%Y-W%V) \
+            --history
+
+      - name: 上传汇总报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-$(date +%Y-W%V)
+          path: reports/
+          retention-days: 365
+
+      - name: 推送到企业微信（可选）
+        if: env.WECOM_WEBHOOK != ''
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          WEEK=$(date +%Y-W%V)
+          SUMMARY_FILE="reports/$WEEK/summary.md"
+
+          if [ -f "$SUMMARY_FILE" ]; then
+            CONTENT=$(cat "$SUMMARY_FILE" | head -50)
+            curl -s -X POST "$WECOM_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"msgtype\": \"markdown\",
+                \"markdown\": {
+                  \"content\": \"## 📊 实习生周度评审汇总 - $WEEK\n\n$CONTENT\n\n[查看完整报告](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
+                }
+              }"
+          fi
+
+      - name: 推送到飞书（可选）
+        if: env.FEISHU_WEBHOOK != ''
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: |
+          WEEK=$(date +%Y-W%V)
+          SUMMARY_FILE="reports/$WEEK/summary.md"
+
+          if [ -f "$SUMMARY_FILE" ]; then
+            CONTENT=$(cat "$SUMMARY_FILE" | head -50 | sed 's/"/\\"/g' | tr '\n' '\\n')
+            curl -s -X POST "$FEISHU_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"msg_type\": \"interactive\",
+                \"card\": {
+                  \"header\": {
+                    \"title\": {\"tag\": \"plain_text\", \"content\": \"📊 实习生周度评审汇总 - $WEEK\"}
+                  },
+                  \"elements\": [
+                    {\"tag\": \"markdown\", \"content\": \"$CONTENT\"}
+                  ]
+                }
+              }"
+          fi

@@ -1,0 +1,81 @@
+# 统一评分标准配置
+
+scoring:
+  scale: [0, 100]
+
+  levels:
+    A:
+      min: 90
+      max: 100
+      label: "优秀"
+      emoji: "🟢"
+      comment: "超出预期，可独立承担小型任务"
+    B:
+      min: 75
+      max: 89
+      label: "良好"
+      emoji: "🔵"
+      comment: "符合预期，稳定成长中"
+    C:
+      min: 60
+      max: 74
+      label: "合格"
+      emoji: "🟡"
+      comment: "基本达标，但需要更多指导"
+    D:
+      min: 0
+      max: 59
+      label: "需改进"
+      emoji: "🔴"
+      comment: "低于预期，需要重点关注和辅导"
+
+  # 各维度权重（所有岗位通用）
+  dimensions:
+    code_quality:
+      weight: 15
+      label: "代码规范"
+    correctness:
+      weight: 25
+      label: "逻辑正确性"
+    growth:
+      weight: 20
+      label: "学习成长"
+    engineering:
+      weight: 15
+      label: "工程实践"
+    collaboration:
+      weight: 10
+      label: "沟通协作"
+    role_specific:
+      weight: 15
+      label: "岗位专项"
+
+  # 趋势标记
+  trend:
+    improved:
+      emoji: "📈"
+      threshold: 3      # 提升3分以上才算进步
+      label: "进步"
+    stable:
+      emoji: "➡️"
+      threshold: 3      # 正负3分内算稳定
+      label: "持平"
+    declined:
+      emoji: "📉"
+      threshold: -3     # 下降3分以上算退步
+      label: "退步"
+
+  # 连续多周等级触发机制
+  alerts:
+    consecutive_d:
+      weeks: 2
+      action: "触发导师1v1辅导"
+      notify: ["mentor", "team_lead"]
+    consecutive_a:
+      weeks: 4
+      action: "推荐转正评估"
+      notify: ["mentor", "hr"]
+    big_drop:
+      threshold: 15     # 单周下降超过15分
+      action: "触发紧急沟通"
+      notify: ["mentor"]

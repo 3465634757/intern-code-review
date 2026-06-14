@@ -1,0 +1,27 @@
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+
+# 运行时生成的报告（可选保留或忽略）
+# reports/
+
+# 临时文件
+*.tmp
+*.log
+/tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+*.orig
