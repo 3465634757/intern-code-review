@@ -4,73 +4,33 @@
 interns:
   # ---- 前端实习生 ----
   - name: "张三"
-    github_id: "zhangsan-dev"        # GitHub/GitLab 用户名
-    role: "frontend"                  # 对应 prompts/{role}-intern.md
+    github_id: "3465634757"           # 替换为真实 GitHub 用户名
+    role: "frontend"
     team: "用户端"
     mentor: "李导师"
-    repos:                            # 该实习生参与的仓库
-      - "company/web-app"
-      - "company/component-lib"
-    branches: ["main", "feature/*"]   # 审查的分支范围
-    start_date: "2026-05-01"          # 入职日期（用于计算成长趋势）
+    repos:
+      - "3465634757/intern-code-review"   # 用本仓库测试
+    branches: ["main"]
+    start_date: "2026-05-01"
 
   # ---- 后端实习生 ----
   - name: "李四"
-    github_id: "lisi-dev"
+    github_id: "torvalds"              # Linux 之父，有大量提交
     role: "backend"
-    team: "交易系统"
+    team: "系统层"
     mentor: "王导师"
     repos:
-      - "company/api-server"
-      - "company/order-service"
-    branches: ["main", "feature/*"]
+      - "torvalds/linux"                # 公开仓库，有丰富提交记录
+    branches: ["main"]
     start_date: "2026-05-15"
 
   # ---- 测试实习生 ----
   - name: "王五"
-    github_id: "wangwu-dev"
+    github_id: "gaearon"               # React 作者
     role: "qa"
     team: "质量保障"
     mentor: "赵导师"
     repos:
-      - "company/test-suites"
-      - "company/e2e-tests"
+      - "facebook/react"                # 公开仓库
     branches: ["main"]
     start_date: "2026-06-01"
-
-  # ---- 移动端实习生 ----
-  - name: "赵六"
-    github_id: "zhaoliu-dev"
-    role: "mobile"
-    team: "移动端"
-    mentor: "孙导师"
-    repos:
-      - "company/android-app"
-      - "company/ios-app"
-    branches: ["main", "develop"]
-    start_date: "2026-05-20"
-
-  # ---- 运维实习生 ----
-  - name: "钱七"
-    github_id: "qianqi-dev"
-    role: "devops"
-    team: "基础设施"
-    mentor: "周导师"
-    repos:
-      - "company/infra"
-      - "company/k8s-configs"
-      - "company/ci-templates"
-    branches: ["main"]
-    start_date: "2026-06-01"
-
-  # ---- 数据实习生 ----
-  - name: "孙八"
-    github_id: "sunba-dev"
-    role: "data"
-    team: "数据平台"
-    mentor: "吴导师"
-    repos:
-      - "company/data-pipeline"
-      - "company/ml-experiments"
-    branches: ["main", "experiment/*"]
-    start_date: "2026-05-10"

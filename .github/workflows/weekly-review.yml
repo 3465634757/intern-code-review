@@ -25,29 +25,41 @@ env:
   REPORTS_BASE: reports
 
 jobs:
+  # 从 interns.yml 动态读取实习生列表
+  load-interns:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 读取实习生配置
+        id: set-matrix
+        run: |
+          # 用 python 解析 YAML 生成 matrix JSON
+          MATRIX=$(python3 -c "
+          import yaml, json
+          with open('config/interns.yml', 'r') as f:
+              config = yaml.safe_load(f)
+          interns = []
+          for i in config.get('interns', []):
+              interns.append({
+                  'name': i['name'],
+                  'role': i['role'],
+                  'github_id': i['github_id'],
+                  'repos': i.get('repos', [])
+              })
+          print(json.dumps({'include': interns}))
+          ")
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "📋 实习生列表: $MATRIX"
+
   generate-reports:
+    needs: load-interns
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        intern:
-          - name: "张三"
-            role: "frontend"
-            github_id: "zhangsan-dev"
-          - name: "李四"
-            role: "backend"
-            github_id: "lisi-dev"
-          - name: "王五"
-            role: "qa"
-            github_id: "wangwu-dev"
-          - name: "赵六"
-            role: "mobile"
-            github_id: "zhaoliu-dev"
-          - name: "钱七"
-            role: "devops"
-            github_id: "qianqi-dev"
-          - name: "孙八"
-            role: "data"
-            github_id: "sunba-dev"
+      matrix: ${{ fromJson(needs.load-interns.outputs.matrix) }}
       max-parallel: 3
       fail-fast: false
 
@@ -75,28 +87,52 @@ jobs:
       - name: 收集本周提交
         id: commits
         run: |
-          AUTHOR="${{ matrix.intern.github_id }}"
+          AUTHOR="${{ matrix.github_id }}"
           SINCE="${{ steps.week.outputs.since }}"
 
-          COMMITS=$(git log \
-            --author="$AUTHOR" \
-            --since="$SINCE" \
-            --pretty=format:"%h|%s|%ai|%an" \
-            --no-merges 2>/dev/null || echo "")
+          # 克隆仓库（如果需要审查多个仓库，可扩展）
+          REPO="${{ matrix.repos }}"
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
 
-          DIFF=$(git log \
-            --author="$AUTHOR" \
-            --since="$SINCE" \
-            --no-merges \
-            -p --stat 2>/dev/null || echo "")
+          # 如果不是当前仓库，需要克隆
+          CURRENT_REPO="${{ github.repository }}"
+          if [ "$REPO" != "$CURRENT_REPO" ]; then
+            echo "📥 克隆仓库: $REPO"
+            git clone "https://github.com/$REPO.git" /tmp/repo-$REPO_NAME 2>/dev/null || echo "  警告: 无法克隆 $REPO"
+          fi
+
+          # 确定仓库路径
+          if [ "$REPO" = "$CURRENT_REPO" ]; then
+            REPO_DIR="${{ github.workspace }}"
+          else
+            REPO_DIR="/tmp/repo-$REPO_NAME"
+          fi
 
           mkdir -p /tmp/intern-review
+
+          if [ -d "$REPO_DIR" ]; then
+            COMMITS=$(git -C "$REPO_DIR" log \
+              --author="$AUTHOR" \
+              --since="$SINCE" \
+              --pretty=format:"%h|%s|%ai|%an" \
+              --no-merges 2>/dev/null || echo "")
+
+            DIFF=$(git -C "$REPO_DIR" log \
+              --author="$AUTHOR" \
+              --since="$SINCE" \
+              --no-merges \
+              -p --stat 2>/dev/null || echo "")
+          else
+            COMMITS=""
+            DIFF=""
+          fi
+
           echo "$COMMITS" > /tmp/intern-review/commits.txt
           echo "$DIFF" > /tmp/intern-review/diff.txt
 
           COMMIT_COUNT=$(echo "$COMMITS" | grep -c '|' || echo "0")
           echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
-          echo "📋 ${{ matrix.intern.name }} 本周提交: $COMMIT_COUNT 条"
+          echo "📋 ${{ matrix.name }} 本周提交: $COMMIT_COUNT 条"
 
       - name: 生成评审报告
         env:
@@ -108,20 +144,19 @@ jobs:
         if: inputs.dry_run != true
         run: |
           WEEK="${{ steps.week.outputs.week }}"
-          NAME="${{ matrix.intern.name }}"
-          ROLE="${{ matrix.intern.role }}"
+          NAME="${{ matrix.name }}"
+          ROLE="${{ matrix.role }}"
           OUTPUT_DIR="${{ env.REPORTS_BASE }}/$WEEK"
           OUTPUT_FILE="$OUTPUT_DIR/${ROLE}-${NAME}.md"
 
           mkdir -p "$OUTPUT_DIR"
 
-          # 构建命令参数
           EXTRA_ARGS=""
           if [ -n "${{ inputs.provider }}" ]; then
             EXTRA_ARGS="--provider ${{ inputs.provider }}"
           fi
 
-          python scripts/generate-report.py \
+          python3 scripts/generate-report.py \
             --config config/interns.yml \
             --intern "$NAME" \
             --week "$WEEK" \
@@ -136,9 +171,9 @@ jobs:
         if: inputs.dry_run == true
         run: |
           WEEK="${{ steps.week.outputs.week }}"
-          NAME="${{ matrix.intern.name }}"
+          NAME="${{ matrix.name }}"
 
-          python scripts/generate-report.py \
+          python3 scripts/generate-report.py \
             --intern "$NAME" \
             --week "$WEEK" \
             --commits-file /tmp/intern-review/commits.txt \
@@ -149,14 +184,14 @@ jobs:
         uses: actions/upload-artifact@v4
         if: inputs.dry_run != true
         with:
-          name: report-${{ matrix.intern.name }}-${{ steps.week.outputs.week }}
+          name: report-${{ matrix.name }}-${{ steps.week.outputs.week }}
           path: ${{ env.REPORTS_BASE }}/${{ steps.week.outputs.week }}/
           retention-days: 90
 
   # 汇总所有报告
   aggregate:
     needs: generate-reports
-    if: inputs.dry_run != true
+    if: inputs.dry_run != true && always()
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
@@ -183,7 +218,7 @@ jobs:
 
       - name: 汇总分数
         run: |
-          python scripts/aggregate-scores.py \
+          python3 scripts/aggregate-scores.py \
             --reports-dir reports/$(date +%Y-W%V) \
             --history
 
@@ -193,48 +228,3 @@ jobs:
           name: summary-$(date +%Y-W%V)
           path: reports/
           retention-days: 365
-
-      - name: 推送到企业微信（可选）
-        if: env.WECOM_WEBHOOK != ''
-        env:
-          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
-        run: |
-          WEEK=$(date +%Y-W%V)
-          SUMMARY_FILE="reports/$WEEK/summary.md"
-
-          if [ -f "$SUMMARY_FILE" ]; then
-            CONTENT=$(cat "$SUMMARY_FILE" | head -50)
-            curl -s -X POST "$WECOM_WEBHOOK" \
-              -H 'Content-Type: application/json' \
-              -d "{
-                \"msgtype\": \"markdown\",
-                \"markdown\": {
-                  \"content\": \"## 📊 实习生周度评审汇总 - $WEEK\n\n$CONTENT\n\n[查看完整报告](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
-                }
-              }"
-          fi
-
-      - name: 推送到飞书（可选）
-        if: env.FEISHU_WEBHOOK != ''
-        env:
-          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-        run: |
-          WEEK=$(date +%Y-W%V)
-          SUMMARY_FILE="reports/$WEEK/summary.md"
-
-          if [ -f "$SUMMARY_FILE" ]; then
-            CONTENT=$(cat "$SUMMARY_FILE" | head -50 | sed 's/"/\\"/g' | tr '\n' '\\n')
-            curl -s -X POST "$FEISHU_WEBHOOK" \
-              -H 'Content-Type: application/json' \
-              -d "{
-                \"msg_type\": \"interactive\",
-                \"card\": {
-                  \"header\": {
-                    \"title\": {\"tag\": \"plain_text\", \"content\": \"📊 实习生周度评审汇总 - $WEEK\"}
-                  },
-                  \"elements\": [
-                    {\"tag\": \"markdown\", \"content\": \"$CONTENT\"}
-                  ]
-                }
-              }"
-          fi
