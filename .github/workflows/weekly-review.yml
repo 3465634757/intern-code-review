@@ -202,6 +202,7 @@ jobs:
           NAME="${{ matrix.name }}"
 
           python3 scripts/generate-report.py \
+            --config config/interns.yml \
             --intern "$NAME" \
             --week "$WEEK" \
             --commits-file /tmp/intern-review/commits.txt \
