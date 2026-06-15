@@ -2,16 +2,16 @@
 # 修改此文件即可增减实习生，无需改代码
 
 interns:
-  # ---- 前端实习生 ----
-  - name: "张三"
-    github_id: "3465634757"           # 替换为真实 GitHub 用户名
-    role: "frontend"
-    team: "用户端"
-    mentor: "李导师"
+  - name: "Sebastian Beltran"
+    github_id: "seb-beltran"
+    role: "backend"
+    team: "Node.js"
+    mentor: "测试导师"
     repos:
-      - "vuejs/core"                   # Vue.js 核心库，本周有提交
-    branches: ["main"]
-    start_date: "2026-05-01"
+      - "expressjs/express"          # ← 就是你 clone 的那个仓库
+    branches: ["master"]
+    start_date: "2025-01-01"
+
 
   # ---- 后端实习生 ----
   - name: "李四"
