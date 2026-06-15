@@ -101,15 +101,22 @@ jobs:
           AUTHOR="${{ matrix.github_id }}"
           SINCE="${{ steps.week.outputs.since }}"
 
-          # 克隆仓库（如果需要审查多个仓库，可扩展）
-          REPO="${{ matrix.repos }}"
+          # ==============================================
+          # ✅ 修复 1：repos 是数组，取第一个元素（核心修复！）
+          # ==============================================
+          REPO="${{ matrix.repos[0] }}"
           REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          
+          echo "🔍 审查配置:"
+          echo "   作者: $AUTHOR"
+          echo "   仓库: $REPO"
+          echo "   起始日期: $SINCE"
 
           # 如果不是当前仓库，需要克隆
           CURRENT_REPO="${{ github.repository }}"
           if [ "$REPO" != "$CURRENT_REPO" ]; then
             echo "📥 克隆仓库: $REPO"
-            git clone "https://github.com/$REPO.git" /tmp/repo-$REPO_NAME 2>/dev/null || echo "  警告: 无法克隆 $REPO"
+            git clone "https://github.com/$REPO.git" /tmp/repo-$REPO_NAME 2>/dev/null || echo "  ⚠️ 警告: 无法克隆 $REPO"
           fi
 
           # 确定仓库路径
@@ -122,6 +129,7 @@ jobs:
           mkdir -p /tmp/intern-review
 
           if [ -d "$REPO_DIR" ]; then
+            echo "📂 仓库路径: $REPO_DIR"
             COMMITS=$(git -C "$REPO_DIR" log \
               --author="$AUTHOR" \
               --since="$SINCE" \
@@ -142,11 +150,17 @@ jobs:
           echo "$DIFF" > /tmp/intern-review/diff.txt
 
           COMMIT_COUNT=$(echo "$COMMITS" | grep -c '|' || echo "0")
-          # 修复：给数字加前缀，避免 GitHub Actions 解析错误
+          
+          # ==============================================
+          # ✅ 修复 2：数字加前缀，避免 GitHub Actions 解析 '0' 报错
+          # ==============================================
           echo "commit_count=count_$COMMIT_COUNT" >> $GITHUB_OUTPUT
           echo "commit_count_raw=$COMMIT_COUNT" >> $GITHUB_OUTPUT
           echo "📋 ${{ matrix.name }} 本周提交: $COMMIT_COUNT 条"
- 
+          
+          if [ "$COMMIT_COUNT" = "0" ]; then
+            echo "  💡 提示: 未抓取到提交，建议手动设置 since 为更早日期（如 2026-01-01）"
+          fi
 
       - name: 生成评审报告
         env:
