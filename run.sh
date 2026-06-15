@@ -62,17 +62,17 @@ echo "📅 起始日期: $SINCE"
 OUTPUT_DIR="reports/$WEEK"
 mkdir -p "$OUTPUT_DIR"
 
-# 检测可用的 AI Provider
+# 检测可用的 AI Provider（国内无需翻墙的优先）
 if [ -z "$PROVIDER" ]; then
-    if [ -n "${GEMINI_API_KEY:-}" ]; then
-        PROVIDER="gemini"
-        echo "🤖 自动选择 Provider: Google Gemini（免费）"
-    elif [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+    if [ -n "${DEEPSEEK_API_KEY:-}" ]; then
         PROVIDER="deepseek"
-        echo "🤖 自动选择 Provider: DeepSeek"
+        echo "🤖 自动选择 Provider: DeepSeek（国内直连）"
     elif [ -n "${SILICONFLOW_API_KEY:-}" ]; then
         PROVIDER="siliconflow"
-        echo "🤖 自动选择 Provider: SiliconFlow"
+        echo "🤖 自动选择 Provider: SiliconFlow（国内直连）"
+    elif [ -n "${GEMINI_API_KEY:-}" ]; then
+        PROVIDER="gemini"
+        echo "🤖 自动选择 Provider: Google Gemini"
     elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
         PROVIDER="anthropic"
         echo "🤖 自动选择 Provider: Anthropic Claude"
@@ -82,10 +82,10 @@ if [ -z "$PROVIDER" ]; then
     else
         echo "❌ 错误: 未检测到可用的 AI API Key"
         echo ""
-        echo "请设置以下任一环境变量（推荐 Gemini，免费）:"
-        echo "  export GEMINI_API_KEY=\"your-key\"       # https://aistudio.google.com/apikey"
-        echo "  export DEEPSEEK_API_KEY=\"your-key\"     # https://platform.deepseek.com"
-        echo "  export SILICONFLOW_API_KEY=\"your-key\"  # https://cloud.siliconflow.cn"
+        echo "请设置以下任一环境变量（推荐 DeepSeek，国内直连免费）:"
+        echo "  export DEEPSEEK_API_KEY=\"your-key\"      # https://platform.deepseek.com"
+        echo "  export SILICONFLOW_API_KEY=\"your-key\"   # https://cloud.siliconflow.cn"
+        echo "  export GEMINI_API_KEY=\"your-key\"        # https://aistudio.google.com/apikey（需翻墙）"
         exit 1
     fi
 else

@@ -48,28 +48,32 @@ pip install -r requirements.txt
 
 ### 2. 配置 AI API（选择一个即可）
 
-#### 🟢 推荐：Google Gemini（免费）
-
-```bash
-# 去 https://aistudio.google.com/apikey 申请免费 API Key
-export GEMINI_API_KEY="your-gemini-key"
-```
-
-免费额度：15 次/分钟，100 万 token/天，完全够用。
-
-#### 🟡 国内推荐：DeepSeek
+#### 🟢 国内推荐：DeepSeek（免费额度，无需翻墙）
 
 ```bash
 # 去 https://platform.deepseek.com 注册，送免费额度
 export DEEPSEEK_API_KEY="your-deepseek-key"
 ```
 
-#### 🟡 国内推荐：硅基流动 SiliconFlow
+国内直连，速度快，推理能力强，注册即送免费额度。
+
+#### 🟢 国内推荐：硅基流动 SiliconFlow（免费额度，无需翻墙）
 
 ```bash
 # 去 https://cloud.siliconflow.cn 注册，送免费额度
 export SILICONFLOW_API_KEY="your-siliconflow-key"
 ```
+
+国内平台，支持多种开源模型可选。
+
+#### 🟡 需要翻墙：Google Gemini（免费额度充足）
+
+```bash
+# 去 https://aistudio.google.com/apikey 申请免费 API Key
+export GEMINI_API_KEY="your-gemini-key"
+```
+
+免费额度：15 次/分钟，100 万 token/天。需要能访问 Google。
 
 #### 🔵 收费选项（可选）
 

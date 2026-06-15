@@ -80,8 +80,8 @@ PROVIDERS = {
     },
 }
 
-# Provider 优先级（自动检测时按此顺序尝试）
-PROVIDER_PRIORITY = ["gemini", "deepseek", "siliconflow", "anthropic", "openai"]
+# Provider 优先级（自动检测时按此顺序尝试，国内无需翻墙的排前面）
+PROVIDER_PRIORITY = ["deepseek", "siliconflow", "gemini", "anthropic", "openai"]
 
 
 def detect_provider():
