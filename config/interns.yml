@@ -8,7 +8,7 @@ interns:
     team: "Node.js"
     mentor: "测试导师"
     repos:
-      - "expressjs/express"          # ← 就是你 clone 的那个仓库
+      - "3465634757/express"          # ← 就是你 clone 的那个仓库
     branches: ["master"]
     start_date: "2025-01-01"
 
