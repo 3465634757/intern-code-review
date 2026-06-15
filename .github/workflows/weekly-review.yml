@@ -142,8 +142,11 @@ jobs:
           echo "$DIFF" > /tmp/intern-review/diff.txt
 
           COMMIT_COUNT=$(echo "$COMMITS" | grep -c '|' || echo "0")
-          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          # 修复：给数字加前缀，避免 GitHub Actions 解析错误
+          echo "commit_count=count_$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          echo "commit_count_raw=$COMMIT_COUNT" >> $GITHUB_OUTPUT
           echo "📋 ${{ matrix.name }} 本周提交: $COMMIT_COUNT 条"
+ 
 
       - name: 生成评审报告
         env:
