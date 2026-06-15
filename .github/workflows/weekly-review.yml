@@ -10,6 +10,11 @@ on:
         description: '审查周（格式: 2026-W24，留空则自动取本周）'
         required: false
         type: string
+      provider:
+        description: 'AI Provider（gemini/deepseek/siliconflow/anthropic/openai，留空自动检测）'
+        required: false
+        type: string
+        default: ''
       dry_run:
         description: '试运行（只收集数据，不调用AI）'
         required: false
@@ -24,8 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # 从 interns.yml 中读取实习生列表
-        # 实际使用时需要动态生成，这里用示例数据
         intern:
           - name: "张三"
             role: "frontend"
@@ -45,7 +48,6 @@ jobs:
           - name: "孙八"
             role: "data"
             github_id: "sunba-dev"
-      # 防止同时太多请求打爆 API
       max-parallel: 3
       fail-fast: false
 
@@ -56,7 +58,7 @@ jobs:
           fetch-depth: 0
 
       - name: 安装 Python 依赖
-        run: pip install pyyaml anthropic
+        run: pip install pyyaml google-genai openai
 
       - name: 确定审查周
         id: week
@@ -67,7 +69,6 @@ jobs:
             WEEK=$(date +%Y-W%V)
             echo "week=$WEEK" >> $GITHUB_OUTPUT
           fi
-          # 计算本周一日期
           MONDAY=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d)
           echo "since=$MONDAY" >> $GITHUB_OUTPUT
 
@@ -89,7 +90,6 @@ jobs:
             --no-merges \
             -p --stat 2>/dev/null || echo "")
 
-          # 保存到文件（避免环境变量溢出）
           mkdir -p /tmp/intern-review
           echo "$COMMITS" > /tmp/intern-review/commits.txt
           echo "$DIFF" > /tmp/intern-review/diff.txt
@@ -100,7 +100,11 @@ jobs:
 
       - name: 生成评审报告
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         if: inputs.dry_run != true
         run: |
           WEEK="${{ steps.week.outputs.week }}"
@@ -111,13 +115,20 @@ jobs:
 
           mkdir -p "$OUTPUT_DIR"
 
+          # 构建命令参数
+          EXTRA_ARGS=""
+          if [ -n "${{ inputs.provider }}" ]; then
+            EXTRA_ARGS="--provider ${{ inputs.provider }}"
+          fi
+
           python scripts/generate-report.py \
             --config config/interns.yml \
             --intern "$NAME" \
             --week "$WEEK" \
             --commits-file /tmp/intern-review/commits.txt \
             --diff-file /tmp/intern-review/diff.txt \
-            --output "$OUTPUT_FILE"
+            --output "$OUTPUT_FILE" \
+            $EXTRA_ARGS
 
           echo "✅ 报告已生成: $OUTPUT_FILE"
 
@@ -163,7 +174,6 @@ jobs:
 
       - name: 整理报告目录
         run: |
-          # 将下载的 artifact 整理到正确目录结构
           WEEK=$(date +%Y-W%V)
           mkdir -p reports/$WEEK
           for dir in reports/report-*/; do

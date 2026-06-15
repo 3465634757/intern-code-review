@@ -2,6 +2,13 @@
 """
 generate-report.py - 调用 AI 生成实习生周度评审报告
 
+支持的 AI Provider（按推荐顺序）:
+  1. gemini      - Google Gemini（免费，推荐）
+  2. deepseek    - DeepSeek（国内可用，注册送额度）
+  3. siliconflow - 硅基流动（国内平台，免费额度）
+  4. anthropic   - Claude（收费）
+  5. openai      - GPT-4o（收费）
+
 用法:
   python generate-report.py \
     --config config/interns.yml \
@@ -19,6 +26,12 @@ generate-report.py - 调用 AI 生成实习生周度评审报告
     --role "frontend" \
     --week "2026-W24" \
     --output report.md
+
+  指定 provider:
+  python generate-report.py \
+    --provider deepseek \
+    --intern "张三" \
+    ...
 """
 
 import argparse
@@ -29,6 +42,213 @@ import yaml
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# ============================================================
+# Provider 配置
+# ============================================================
+
+PROVIDERS = {
+    "gemini": {
+        "name": "Google Gemini",
+        "env_key": "GEMINI_API_KEY",
+        "default_model": "gemini-2.0-flash",
+        "description": "免费额度充足，推荐首选",
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "env_key": "DEEPSEEK_API_KEY",
+        "default_model": "deepseek-chat",
+        "description": "国内可用，推理能力强",
+    },
+    "siliconflow": {
+        "name": "SiliconFlow (硅基流动)",
+        "env_key": "SILICONFLOW_API_KEY",
+        "default_model": "Qwen/Qwen2.5-72B-Instruct",
+        "description": "国内平台，支持多种开源模型",
+    },
+    "anthropic": {
+        "name": "Anthropic Claude",
+        "env_key": "ANTHROPIC_API_KEY",
+        "default_model": "claude-sonnet-4-20250514",
+        "description": "收费，质量高",
+    },
+    "openai": {
+        "name": "OpenAI GPT",
+        "env_key": "OPENAI_API_KEY",
+        "default_model": "gpt-4o",
+        "description": "收费，通用能力强",
+    },
+}
+
+# Provider 优先级（自动检测时按此顺序尝试）
+PROVIDER_PRIORITY = ["gemini", "deepseek", "siliconflow", "anthropic", "openai"]
+
+
+def detect_provider():
+    """自动检测可用的 provider（按优先级）"""
+    for provider_id in PROVIDER_PRIORITY:
+        config = PROVIDERS[provider_id]
+        if os.environ.get(config["env_key"]):
+            return provider_id
+    return None
+
+
+# ============================================================
+# 各 Provider 的 API 调用实现
+# ============================================================
+
+
+def call_gemini(prompt, model, api_key):
+    """调用 Google Gemini API"""
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+        )
+        return response.text
+    except ImportError:
+        # fallback: 使用 REST API
+        import urllib.request
+        import urllib.error
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 8192}
+        }).encode("utf-8")
+
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return result["candidates"][0]["content"]["parts"][0]["text"]
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8") if e.fp else ""
+            raise RuntimeError(f"Gemini API 错误 ({e.code}): {error_body}")
+
+
+def call_deepseek(prompt, model, api_key):
+    """调用 DeepSeek API（兼容 OpenAI 格式）"""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except ImportError:
+        # fallback: 使用 REST API
+        import urllib.request
+        import urllib.error
+
+        url = "https://api.deepseek.com/chat/completions"
+        payload = json.dumps({
+            "model": model,
+            "max_tokens": 8192,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return result["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8") if e.fp else ""
+            raise RuntimeError(f"DeepSeek API 错误 ({e.code}): {error_body}")
+
+
+def call_siliconflow(prompt, model, api_key):
+    """调用 SiliconFlow API（兼容 OpenAI 格式）"""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url="https://api.siliconflow.cn/v1")
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except ImportError:
+        import urllib.request
+        import urllib.error
+
+        url = "https://api.siliconflow.cn/v1/chat/completions"
+        payload = json.dumps({
+            "model": model,
+            "max_tokens": 8192,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return result["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8") if e.fp else ""
+            raise RuntimeError(f"SiliconFlow API 错误 ({e.code}): {error_body}")
+
+
+def call_anthropic(prompt, model, api_key):
+    """调用 Anthropic Claude API"""
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=model,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return message.content[0].text
+    except ImportError:
+        raise RuntimeError("请先安装 anthropic SDK: pip install anthropic")
+
+
+def call_openai(prompt, model, api_key):
+    """调用 OpenAI GPT API"""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except ImportError:
+        raise RuntimeError("请先安装 openai SDK: pip install openai")
+
+
+# Provider 调用映射
+PROVIDER_CALLERS = {
+    "gemini": call_gemini,
+    "deepseek": call_deepseek,
+    "siliconflow": call_siliconflow,
+    "anthropic": call_anthropic,
+    "openai": call_openai,
+}
+
+
+# ============================================================
+# 核心逻辑
+# ============================================================
 
 
 def load_config(config_path):
@@ -49,15 +269,13 @@ def get_week_range(week_str):
     """解析 '2026-W24' 格式，返回起止日期"""
     year = int(week_str.split('-W')[0])
     week_num = int(week_str.split('-W')[1])
-    # ISO week: Monday = day 1
     jan1 = datetime(year, 1, 1)
-    # 找到该年的第一个周一
     if jan1.weekday() <= 3:
         start = jan1 - timedelta(days=jan1.weekday())
     else:
         start = jan1 + timedelta(days=7 - jan1.weekday())
     week_start = start + timedelta(weeks=week_num - 1)
-    week_end = week_start + timedelta(days=4)  # 到周五
+    week_end = week_start + timedelta(days=4)
     return week_start.strftime('%Y-%m-%d'), week_end.strftime('%Y-%m-%d')
 
 
@@ -70,11 +288,9 @@ def fetch_commits(intern, since, until, repo_path=None):
     all_diffs = []
 
     for repo in repos:
-        # 如果本地有仓库路径，直接用 git 命令
         repo_dir = repo_path / repo.split('/')[-1] if repo_path else None
         if repo_dir and repo_dir.exists():
             try:
-                # 获取提交记录
                 result = subprocess.run(
                     ['git', 'log',
                      f'--author={github_id}',
@@ -87,7 +303,6 @@ def fetch_commits(intern, since, until, repo_path=None):
                 if result.stdout.strip():
                     all_commits.append(f"## 仓库: {repo}\n{result.stdout}")
 
-                # 获取 diff 统计
                 result = subprocess.run(
                     ['git', 'log',
                      f'--author={github_id}',
@@ -118,7 +333,7 @@ def load_prompt(base_file, role_file):
     return f"{base}\n\n---\n\n{role}"
 
 
-def call_ai(prompt, commits, diff, intern_name, role, model="claude-sonnet-4-20250514"):
+def call_ai(prompt, commits, diff, intern_name, role, provider, model, api_key):
     """调用 AI API 生成报告"""
     # 截断 diff 避免超 token 限制
     max_diff = 50000
@@ -146,52 +361,92 @@ def call_ai(prompt, commits, diff, intern_name, role, model="claude-sonnet-4-202
 注意：即使代码量很少，也必须按模板完整输出，对少量代码做深度审查。
 """
 
-    # 尝试使用 anthropic SDK
-    try:
-        import anthropic
-        client = anthropic.Anthropic()
-        message = client.messages.create(
-            model=model,
-            max_tokens=4096,
-            messages=[{"role": "user", "content": full_prompt}]
-        )
-        return message.content[0].text
-    except ImportError:
-        pass
+    caller = PROVIDER_CALLERS.get(provider)
+    if not caller:
+        raise ValueError(f"不支持的 provider: {provider}")
 
-    # 尝试使用 openai SDK
-    try:
-        import openai
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=4096,
-            messages=[{"role": "user", "content": full_prompt}]
-        )
-        return response.choices[0].message.content
-    except ImportError:
-        pass
-
-    # 如果都没有安装，输出 prompt 供手动使用
-    print("警告: 未安装 anthropic 或 openai SDK，请先 pip install anthropic 或 pip install openai", file=sys.stderr)
-    return None
+    print(f"  🤖 调用 {PROVIDERS[provider]['name']} ({model})...")
+    return caller(full_prompt, model, api_key)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='生成实习生周度评审报告')
+    parser = argparse.ArgumentParser(
+        description='生成实习生周度评审报告',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+支持的 AI Provider:
+  gemini        Google Gemini（免费，推荐首选）
+  deepseek      DeepSeek（国内可用，推理能力强）
+  siliconflow   硅基流动（国内平台，多模型可选）
+  anthropic     Claude（收费）
+  openai        GPT-4o（收费）
+
+示例:
+  # 使用 Gemini（默认，自动检测 API Key）
+  export GEMINI_API_KEY="your-key"
+  python generate-report.py --intern "张三"
+
+  # 指定 provider
+  python generate-report.py --provider deepseek --intern "张三"
+
+  # 指定模型
+  python generate-report.py --provider gemini --model gemini-2.5-pro --intern "张三"
+""",
+    )
     parser.add_argument('--config', default='config/interns.yml', help='实习生配置文件')
     parser.add_argument('--intern', required=True, help='实习生姓名')
     parser.add_argument('--week', help='审查周，格式: 2026-W24（默认本周）')
     parser.add_argument('--output', '-o', help='输出文件路径')
-    parser.add_argument('--model', default='claude-sonnet-4-20250514', help='AI 模型')
+    parser.add_argument('--provider', help='AI provider（默认自动检测可用的）')
+    parser.add_argument('--model', help='AI 模型（默认使用 provider 推荐模型）')
     parser.add_argument('--repo-path', help='仓库本地路径（可选）')
     parser.add_argument('--dry-run', action='store_true', help='只输出 prompt，不调用 AI')
+    parser.add_argument('--list-providers', action='store_true', help='列出所有支持的 provider')
 
     # 也支持手动传入数据（不从 Git 拉取）
     parser.add_argument('--commits-file', help='手动指定提交记录文件')
     parser.add_argument('--diff-file', help='手动指定 diff 文件')
 
     args = parser.parse_args()
+
+    # 列出 provider
+    if args.list_providers:
+        print("\n支持的 AI Provider:\n")
+        for pid in PROVIDER_PRIORITY:
+            pc = PROVIDERS[pid]
+            has_key = "✅" if os.environ.get(pc["env_key"]) else "❌"
+            print(f"  {pid:15s} {pc['name']:25s} Key: {has_key}  {pc['description']}")
+        print(f"\n环境变量: {', '.join(PROVIDERS[p]['env_key'] for p in PROVIDER_PRIORITY)}")
+        return
+
+    # 确定 provider
+    provider = args.provider
+    if not provider:
+        provider = detect_provider()
+        if not provider:
+            print("错误: 未检测到可用的 AI API Key。请设置以下任一环境变量:", file=sys.stderr)
+            for pid in PROVIDER_PRIORITY:
+                pc = PROVIDERS[pid]
+                print(f"  export {pc['env_key']}=\"your-key\"  # {pc['name']} - {pc['description']}", file=sys.stderr)
+            print(f"\n或使用 --list-providers 查看所有选项", file=sys.stderr)
+            sys.exit(1)
+        print(f"  🔍 自动检测到 provider: {PROVIDERS[provider]['name']}")
+
+    if provider not in PROVIDERS:
+        print(f"错误: 不支持的 provider '{provider}'", file=sys.stderr)
+        print(f"支持的: {', '.join(PROVIDER_PRIORITY)}", file=sys.stderr)
+        sys.exit(1)
+
+    # 获取 API Key
+    pc = PROVIDERS[provider]
+    api_key = os.environ.get(pc["env_key"])
+    if not api_key:
+        print(f"错误: 未设置 {pc['env_key']}", file=sys.stderr)
+        print(f"  export {pc['env_key']}=\"your-key\"", file=sys.stderr)
+        sys.exit(1)
+
+    # 确定模型
+    model = args.model or pc["default_model"]
 
     # 加载配置
     config = load_config(args.config)
@@ -207,6 +462,7 @@ def main():
 
     since, until = get_week_range(week)
     print(f"📋 生成评审报告: {args.intern} ({role}) | {week} ({since} ~ {until})")
+    print(f"  Provider: {pc['name']} | 模型: {model}")
 
     # 加载提示词
     prompt = load_prompt('_base-template.md', f'{role}-intern.md')
@@ -224,9 +480,8 @@ def main():
     print(f"  提交记录: {len(commits)} 字符")
     print(f"  代码变更: {len(diff)} 字符")
 
-    # 调用 AI 或输出 prompt
+    # dry-run 模式
     if args.dry_run:
-        # dry-run 模式：直接组装并输出 prompt
         max_diff = 50000
         truncated_diff = diff[:max_diff] + f"\n\n... [diff 已截断] ..." if len(diff) > max_diff else diff
         full_prompt = f"""{prompt}
@@ -254,10 +509,13 @@ def main():
         print(full_prompt)
         return
 
-    report = call_ai(prompt, commits, diff, args.intern, role, args.model)
+    # 调用 AI
+    try:
+        report = call_ai(prompt, commits, diff, args.intern, role, provider, model, api_key)
+    except Exception as e:
+        print(f"  ❌ AI 调用失败: {e}", file=sys.stderr)
 
-    if report is None:
-        # AI 调用失败，输出 prompt 到文件
+        # 输出 prompt 到文件供手动使用
         max_diff = 50000
         truncated_diff = diff[:max_diff] + f"\n\n... [diff 已截断] ..." if len(diff) > max_diff else diff
         full_prompt = f"""{prompt}\n\n---\n\n## 待审查数据\n\n### 实习生：{args.intern}\n### 岗位：{role}\n\n### 本周提交记录\n{commits}\n\n### 代码变更详情\n```\n{truncated_diff}\n```\n\n请严格按照上方评审模板格式，输出完整的周度评审报告。"""

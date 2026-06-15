@@ -6,10 +6,21 @@
 #   ./run.sh --intern "张三"     # 只审查指定实习生
 #   ./run.sh --week 2026-W24    # 指定周次
 #   ./run.sh --dry-run          # 试运行（只收集数据，不调用AI）
+#   ./run.sh --provider deepseek # 指定 AI Provider
+#
+# 支持的 AI Provider（按优先级自动检测）:
+#   gemini        - Google Gemini（免费，推荐）
+#   deepseek      - DeepSeek（国内可用）
+#   siliconflow   - 硅基流动（国内平台）
+#   anthropic     - Claude（收费）
+#   openai        - GPT-4o（收费）
 #
 # 前置条件:
 #   1. pip install -r requirements.txt
-#   2. 设置环境变量 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
+#   2. 设置环境变量（任选一个）:
+#      export GEMINI_API_KEY="your-key"       # 推荐
+#      export DEEPSEEK_API_KEY="your-key"
+#      export SILICONFLOW_API_KEY="your-key"
 #   3. 根据实际情况修改 config/interns.yml 中的仓库路径
 
 set -euo pipefail
@@ -21,7 +32,8 @@ cd "$SCRIPT_DIR"
 INTERN=""
 WEEK=""
 DRY_RUN=""
-REPO_BASE=""  # 仓库本地路径前缀，如 /home/dev/repos
+REPO_BASE=""
+PROVIDER=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -29,6 +41,7 @@ while [[ $# -gt 0 ]]; do
         --week) WEEK="$2"; shift 2 ;;
         --dry-run) DRY_RUN="--dry-run"; shift ;;
         --repo-base) REPO_BASE="$2"; shift 2 ;;
+        --provider) PROVIDER="$2"; shift 2 ;;
         *) echo "未知参数: $1"; exit 1 ;;
     esac
 done
@@ -49,13 +62,40 @@ echo "📅 起始日期: $SINCE"
 OUTPUT_DIR="reports/$WEEK"
 mkdir -p "$OUTPUT_DIR"
 
+# 检测可用的 AI Provider
+if [ -z "$PROVIDER" ]; then
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+        PROVIDER="gemini"
+        echo "🤖 自动选择 Provider: Google Gemini（免费）"
+    elif [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+        PROVIDER="deepseek"
+        echo "🤖 自动选择 Provider: DeepSeek"
+    elif [ -n "${SILICONFLOW_API_KEY:-}" ]; then
+        PROVIDER="siliconflow"
+        echo "🤖 自动选择 Provider: SiliconFlow"
+    elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        PROVIDER="anthropic"
+        echo "🤖 自动选择 Provider: Anthropic Claude"
+    elif [ -n "${OPENAI_API_KEY:-}" ]; then
+        PROVIDER="openai"
+        echo "🤖 自动选择 Provider: OpenAI GPT"
+    else
+        echo "❌ 错误: 未检测到可用的 AI API Key"
+        echo ""
+        echo "请设置以下任一环境变量（推荐 Gemini，免费）:"
+        echo "  export GEMINI_API_KEY=\"your-key\"       # https://aistudio.google.com/apikey"
+        echo "  export DEEPSEEK_API_KEY=\"your-key\"     # https://platform.deepseek.com"
+        echo "  export SILICONFLOW_API_KEY=\"your-key\"  # https://cloud.siliconflow.cn"
+        exit 1
+    fi
+else
+    echo "🤖 指定 Provider: $PROVIDER"
+fi
+
 # 解析 interns.yml 获取实习生列表
-# 简易解析（完整版建议用 yq 或 python）
 if [ -n "$INTERN" ]; then
-    # 只审查指定实习生
     INTERNS=("$INTERN")
 else
-    # 从配置文件读取所有实习生姓名
     INTERNS=$(grep '^\s*-\s*name:' config/interns.yml | sed 's/.*name:\s*"//;s/".*//' | tr -d ' ')
 fi
 
@@ -87,6 +127,7 @@ for NAME in $INTERNS; do
     CMD="$CMD --intern \"$NAME\""
     CMD="$CMD --week \"$WEEK\""
     CMD="$CMD --output \"$OUTPUT_FILE\""
+    CMD="$CMD --provider \"$PROVIDER\""
 
     if [ -n "$DRY_RUN" ]; then
         CMD="$CMD --dry-run"

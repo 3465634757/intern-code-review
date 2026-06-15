@@ -1,4 +1,14 @@
 # Python 依赖
-anthropic>=0.40.0     # Claude API（主要）
-openai>=1.50.0        # GPT API（备选）
-pyyaml>=6.0           # 配置文件解析
+#
+# 免费 Provider（推荐）
+google-genai>=1.0.0    # Google Gemini API（推荐首选，免费）
+#
+# 兼容 OpenAI 格式的 Provider（DeepSeek / SiliconFlow）
+# 安装 openai SDK 后可同时支持 DeepSeek 和 SiliconFlow
+openai>=1.50.0         # DeepSeek & SiliconFlow 共用此 SDK
+#
+# 收费 Provider（可选）
+# anthropic>=0.40.0    # Claude API（如需使用请取消注释）
+#
+# 公共依赖
+pyyaml>=6.0            # 配置文件解析

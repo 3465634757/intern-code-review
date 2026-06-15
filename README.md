@@ -23,7 +23,7 @@ intern-code-review/
 │   └── scoring-rubric.yml         # 统一评分标准
 ├── scripts/
 │   ├── fetch-commits.sh           # 拉取本周代码变更
-│   ├── generate-report.py         # 调用 AI 生成报告
+│   ├── generate-report.py         # 调用 AI 生成报告（多 Provider）
 │   └── aggregate-scores.py        # 汇总所有人分数
 ├── reports/                       # 生成的周度报告
 │   └── 2026-W24/
@@ -46,11 +46,35 @@ intern-code-review/
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API Key
+### 2. 配置 AI API（选择一个即可）
+
+#### 🟢 推荐：Google Gemini（免费）
 
 ```bash
-# 二选一
-export ANTHROPIC_API_KEY="sk-ant-xxx"    # Claude（推荐）
+# 去 https://aistudio.google.com/apikey 申请免费 API Key
+export GEMINI_API_KEY="your-gemini-key"
+```
+
+免费额度：15 次/分钟，100 万 token/天，完全够用。
+
+#### 🟡 国内推荐：DeepSeek
+
+```bash
+# 去 https://platform.deepseek.com 注册，送免费额度
+export DEEPSEEK_API_KEY="your-deepseek-key"
+```
+
+#### 🟡 国内推荐：硅基流动 SiliconFlow
+
+```bash
+# 去 https://cloud.siliconflow.cn 注册，送免费额度
+export SILICONFLOW_API_KEY="your-siliconflow-key"
+```
+
+#### 🔵 收费选项（可选）
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-xxx"    # Claude
 export OPENAI_API_KEY="sk-xxx"           # GPT-4o
 ```
 
@@ -83,6 +107,12 @@ interns:
 
 # 试运行（只收集数据，不调用AI，用于验证流程）
 ./run.sh --dry-run
+
+# 指定 AI Provider
+./run.sh --provider deepseek
+
+# 查看支持的 Provider
+python scripts/generate-report.py --list-providers
 ```
 
 ### 5. 查看报告
@@ -95,6 +125,28 @@ ls reports/2026-W24/
 # summary.md          ← 汇总看板
 ```
 
+## 🤖 支持的 AI Provider
+
+| Provider | 环境变量 | 默认模型 | 免费？ | 说明 |
+|----------|---------|---------|--------|------|
+| **Google Gemini** | `GEMINI_API_KEY` | `gemini-2.0-flash` | ✅ 免费 | 推荐首选，额度充足 |
+| **DeepSeek** | `DEEPSEEK_API_KEY` | `deepseek-chat` | 🟡 送额度 | 国内可用，推理强 |
+| **SiliconFlow** | `SILICONFLOW_API_KEY` | `Qwen/Qwen2.5-72B-Instruct` | 🟡 送额度 | 国内平台，多模型 |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` | ❌ 收费 | 质量高 |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o` | ❌ 收费 | 通用能力强 |
+
+设置多个 Key 时，按优先级自动选择：Gemini > DeepSeek > SiliconFlow > Anthropic > OpenAI。
+
+可用 `--provider` 手动指定，用 `--model` 覆盖默认模型：
+
+```bash
+# 用 DeepSeek 的 deepseek-reasoner 模型
+python scripts/generate-report.py --provider deepseek --model deepseek-reasoner --intern "张三"
+
+# 用 SiliconFlow 的 Llama 模型
+python scripts/generate-report.py --provider siliconflow --model "meta-llama/Meta-Llama-3.1-70B-Instruct" --intern "张三"
+```
+
 ## 🔄 自动化部署（GitHub Actions）
 
 ### 配置 Secrets
@@ -103,8 +155,11 @@ ls reports/2026-W24/
 
 | Secret 名称 | 说明 |
 |-------------|------|
-| `ANTHROPIC_API_KEY` | Claude API Key（推荐） |
-| `OPENAI_API_KEY` | GPT API Key（备选） |
+| `GEMINI_API_KEY` | Google Gemini API Key（推荐） |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key（备选） |
+| `SILICONFLOW_API_KEY` | 硅基流动 API Key（备选） |
+| `ANTHROPIC_API_KEY` | Claude API Key（可选） |
+| `OPENAI_API_KEY` | GPT API Key（可选） |
 | `WECOM_WEBHOOK` | 企业微信机器人 Webhook（可选） |
 | `FEISHU_WEBHOOK` | 飞书机器人 Webhook（可选） |
 
@@ -200,6 +255,9 @@ A: AI 会对少量代码做深度审查。也可以合并 PR review 数据作为
 
 **Q: 如何横向比较不同岗位的实习生？**
 A: 通用维度（85%）统一标准，岗位专项（15%）差异化，总分可直接比较。
+
+**Q: 免费 API 够用吗？**
+A: Google Gemini 免费额度 15次/分钟、100万 token/天，6 个实习生一周一次审查完全够用。DeepSeek 和 SiliconFlow 注册也送免费额度。
 
 ## 📄 License
 
