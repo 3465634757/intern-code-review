@@ -1,16 +1,16 @@
 # 实习生名单与岗位映射
 # 修改此文件即可增减实习生，无需改代码
-
 interns:
   - name: "Sebastian Beltran"
-    github_id: "3465634757"
+    github_id: "Sebastian Beltran"    # ← 改成实际的 author name
     role: "backend"
     team: "Node.js"
     mentor: "测试导师"
     repos:
-      - "3465634757/express"          # ← 就是你 clone 的那个仓库
+      - "3465634757/express"
     branches: ["master"]
     start_date: "2025-01-01"
+
 
 
   # # ---- 后端实习生 ----
