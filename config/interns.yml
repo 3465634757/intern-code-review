@@ -13,24 +13,24 @@ interns:
     start_date: "2025-01-01"
 
 
-  # ---- 后端实习生 ----
-  - name: "李四"
-    github_id: "tiangolo"              # FastAPI 作者，本周有提交
-    role: "backend"
-    team: "系统层"
-    mentor: "王导师"
-    repos:
-      - "fastapi/fastapi"              # Python Web 框架，本周有提交
-    branches: ["main"]
-    start_date: "2026-05-15"
+  # # ---- 后端实习生 ----
+  # - name: "李四"
+  #   github_id: "tiangolo"              # FastAPI 作者，本周有提交
+  #   role: "backend"
+  #   team: "系统层"
+  #   mentor: "王导师"
+  #   repos:
+  #     - "fastapi/fastapi"              # Python Web 框架，本周有提交
+  #   branches: ["main"]
+  #   start_date: "2026-05-15"
 
-  # ---- 测试实习生 ----
-  - name: "王五"
-    github_id: "expressjs"             # Express 组织账号
-    role: "qa"
-    team: "质量保障"
-    mentor: "赵导师"
-    repos:
-      - "expressjs/express"            # Node.js Web 框架，本周有提交
-    branches: ["main"]
-    start_date: "2026-06-01"
+  # # ---- 测试实习生 ----
+  # - name: "王五"
+  #   github_id: "expressjs"             # Express 组织账号
+  #   role: "qa"
+  #   team: "质量保障"
+  #   mentor: "赵导师"
+  #   repos:
+  #     - "expressjs/express"            # Node.js Web 框架，本周有提交
+  #   branches: ["main"]
+  #   start_date: "2026-06-01"
