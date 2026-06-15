@@ -396,6 +396,7 @@ def main():
     parser.add_argument('--config', default='config/interns.yml', help='实习生配置文件')
     parser.add_argument('--intern', required=True, help='实习生姓名')
     parser.add_argument('--week', help='审查周，格式: 2026-W24（默认本周）')
+    parser.add_argument('--since', help='起始日期，格式: 2026-06-01（覆盖 week 计算的日期）')
     parser.add_argument('--output', '-o', help='输出文件路径')
     parser.add_argument('--provider', help='AI provider（默认自动检测可用的）')
     parser.add_argument('--model', help='AI 模型（默认使用 provider 推荐模型）')
@@ -460,8 +461,14 @@ def main():
         today = datetime.now()
         week = f"{today.year}-W{today.isocalendar()[1]:02d}"
 
-    since, until = get_week_range(week)
-    print(f"📋 生成评审报告: {args.intern} ({role}) | {week} ({since} ~ {until})")
+    # 确定日期范围（--since 优先，否则根据 week 计算）
+    if args.since:
+        since = args.since
+        until = (datetime.strptime(since, '%Y-%m-%d') + timedelta(days=6)).strftime('%Y-%m-%d')
+        print(f"📋 生成评审报告: {args.intern} ({role}) | {since} ~ {until}（手动指定）")
+    else:
+        since, until = get_week_range(week)
+        print(f"📋 生成评审报告: {args.intern} ({role}) | {week} ({since} ~ {until})")
     print(f"  Provider: {pc['name']} | 模型: {model}")
 
     # 加载提示词

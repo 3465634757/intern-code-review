@@ -5,6 +5,8 @@
 #   ./run.sh                    # 审查所有实习生（本周）
 #   ./run.sh --intern "张三"     # 只审查指定实习生
 #   ./run.sh --week 2026-W24    # 指定周次
+#   ./run.sh --since 2026-06-01 # 指定起始日期（自由时间段）
+#   ./run.sh --since 2026-06-01 --week 2026-W24  # 指定日期+周次归档名
 #   ./run.sh --dry-run          # 试运行（只收集数据，不调用AI）
 #   ./run.sh --provider deepseek # 指定 AI Provider
 #
@@ -31,6 +33,7 @@ cd "$SCRIPT_DIR"
 # 解析参数
 INTERN=""
 WEEK=""
+SINCE=""
 DRY_RUN=""
 REPO_BASE=""
 PROVIDER=""
@@ -39,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --intern) INTERN="$2"; shift 2 ;;
         --week) WEEK="$2"; shift 2 ;;
+        --since) SINCE="$2"; shift 2 ;;
         --dry-run) DRY_RUN="--dry-run"; shift ;;
         --repo-base) REPO_BASE="$2"; shift 2 ;;
         --provider) PROVIDER="$2"; shift 2 ;;
@@ -52,11 +56,13 @@ if [ -z "$WEEK" ]; then
 fi
 echo "📅 审查周: $WEEK"
 
-# 确定日期范围
-YEAR=$(echo "$WEEK" | cut -d- -f1)
-WEEK_NUM=$(echo "$WEEK" | grep -oP 'W\K\d+')
-SINCE=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d 2>/dev/null || echo "")
-echo "📅 起始日期: $SINCE"
+# 确定日期范围（优先使用 --since 指定的日期）
+if [ -n "$SINCE" ]; then
+    echo "📅 起始日期: $SINCE（手动指定）"
+else
+    SINCE=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d 2>/dev/null || echo "")
+    echo "📅 起始日期: $SINCE（自动计算）"
+fi
 
 # 创建输出目录
 OUTPUT_DIR="reports/$WEEK"
@@ -128,6 +134,10 @@ for NAME in $INTERNS; do
     CMD="$CMD --week \"$WEEK\""
     CMD="$CMD --output \"$OUTPUT_FILE\""
     CMD="$CMD --provider \"$PROVIDER\""
+
+    if [ -n "$SINCE" ]; then
+        CMD="$CMD --since \"$SINCE\""
+    fi
 
     if [ -n "$DRY_RUN" ]; then
         CMD="$CMD --dry-run"

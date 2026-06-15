@@ -9,28 +9,28 @@ interns:
     team: "用户端"
     mentor: "李导师"
     repos:
-      - "3465634757/intern-code-review"   # 用本仓库测试
+      - "vuejs/core"                   # Vue.js 核心库，本周有提交
     branches: ["main"]
     start_date: "2026-05-01"
 
   # ---- 后端实习生 ----
   - name: "李四"
-    github_id: "torvalds"              # Linux 之父，有大量提交
+    github_id: "tiangolo"              # FastAPI 作者，本周有提交
     role: "backend"
     team: "系统层"
     mentor: "王导师"
     repos:
-      - "torvalds/linux"                # 公开仓库，有丰富提交记录
+      - "fastapi/fastapi"              # Python Web 框架，本周有提交
     branches: ["main"]
     start_date: "2026-05-15"
 
   # ---- 测试实习生 ----
   - name: "王五"
-    github_id: "gaearon"               # React 作者
+    github_id: "expressjs"             # Express 组织账号
     role: "qa"
     team: "质量保障"
     mentor: "赵导师"
     repos:
-      - "facebook/react"                # 公开仓库
+      - "expressjs/express"            # Node.js Web 框架，本周有提交
     branches: ["main"]
     start_date: "2026-06-01"

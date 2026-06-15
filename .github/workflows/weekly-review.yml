@@ -10,6 +10,11 @@ on:
         description: '审查周（格式: 2026-W24，留空则自动取本周）'
         required: false
         type: string
+      since:
+        description: '起始日期（格式: 2026-06-01，留空则根据 week 自动计算）'
+        required: false
+        type: string
+        default: ''
       provider:
         description: 'AI Provider（gemini/deepseek/siliconflow/anthropic/openai，留空自动检测）'
         required: false
@@ -81,8 +86,14 @@ jobs:
             WEEK=$(date +%Y-W%V)
             echo "week=$WEEK" >> $GITHUB_OUTPUT
           fi
-          MONDAY=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d)
-          echo "since=$MONDAY" >> $GITHUB_OUTPUT
+
+          # 优先使用手动指定的日期，否则根据周次自动计算
+          if [ -n "${{ inputs.since }}" ]; then
+            echo "since=${{ inputs.since }}" >> $GITHUB_OUTPUT
+          else
+            MONDAY=$(date -d "last monday" +%Y-%m-%d 2>/dev/null || date -v-monday +%Y-%m-%d)
+            echo "since=$MONDAY" >> $GITHUB_OUTPUT
+          fi
 
       - name: 收集本周提交
         id: commits
