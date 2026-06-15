@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 """
 generate-report.py - 调用 AI 生成实习生周度评审报告
-
 支持的 AI Provider（按推荐顺序）:
   1. gemini      - Google Gemini（免费，推荐）
   2. deepseek    - DeepSeek（国内可用，注册送额度）
   3. siliconflow - 硅基流动（国内平台，免费额度）
   4. anthropic   - Claude（收费）
   5. openai      - GPT-4o（收费）
-
 用法:
   python generate-report.py \
     --config config/interns.yml \
     --intern "张三" \
     --week "2026-W24" \
     --output reports/2026-W24/frontend-张三.md
-
   或者手动传入数据:
   python generate-report.py \
     --prompt-file prompts/_base-template.md \
@@ -26,14 +23,12 @@ generate-report.py - 调用 AI 生成实习生周度评审报告
     --role "frontend" \
     --week "2026-W24" \
     --output report.md
-
   指定 provider:
   python generate-report.py \
     --provider deepseek \
     --intern "张三" \
     ...
 """
-
 import argparse
 import os
 import sys
@@ -46,7 +41,6 @@ from pathlib import Path
 # ============================================================
 # Provider 配置
 # ============================================================
-
 PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
@@ -96,8 +90,6 @@ def detect_provider():
 # ============================================================
 # 各 Provider 的 API 调用实现
 # ============================================================
-
-
 def call_gemini(prompt, model, api_key):
     """调用 Google Gemini API"""
     try:
@@ -112,13 +104,11 @@ def call_gemini(prompt, model, api_key):
         # fallback: 使用 REST API
         import urllib.request
         import urllib.error
-
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         payload = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"maxOutputTokens": 8192}
         }).encode("utf-8")
-
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -144,14 +134,12 @@ def call_deepseek(prompt, model, api_key):
         # fallback: 使用 REST API
         import urllib.request
         import urllib.error
-
         url = "https://api.deepseek.com/chat/completions"
         payload = json.dumps({
             "model": model,
             "max_tokens": 8192,
             "messages": [{"role": "user", "content": prompt}],
         }).encode("utf-8")
-
         req = urllib.request.Request(
             url, data=payload,
             headers={
@@ -182,14 +170,12 @@ def call_siliconflow(prompt, model, api_key):
     except ImportError:
         import urllib.request
         import urllib.error
-
         url = "https://api.siliconflow.cn/v1/chat/completions"
         payload = json.dumps({
             "model": model,
             "max_tokens": 8192,
             "messages": [{"role": "user", "content": prompt}],
         }).encode("utf-8")
-
         req = urllib.request.Request(
             url, data=payload,
             headers={
@@ -249,8 +235,6 @@ PROVIDER_CALLERS = {
 # ============================================================
 # 核心逻辑
 # ============================================================
-
-
 def load_config(config_path):
     """加载实习生配置"""
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -283,10 +267,8 @@ def fetch_commits(intern, since, until, repo_path=None):
     """从 Git 仓库拉取指定实习生的本周提交"""
     github_id = intern['github_id']
     repos = intern.get('repos', [])
-
     all_commits = []
     all_diffs = []
-
     for repo in repos:
         repo_dir = repo_path / repo.split('/')[-1] if repo_path else None
         if repo_dir and repo_dir.exists():
@@ -302,7 +284,6 @@ def fetch_commits(intern, since, until, repo_path=None):
                 )
                 if result.stdout.strip():
                     all_commits.append(f"## 仓库: {repo}\n{result.stdout}")
-
                 result = subprocess.run(
                     ['git', 'log',
                      f'--author={github_id}',
@@ -316,20 +297,16 @@ def fetch_commits(intern, since, until, repo_path=None):
                     all_diffs.append(f"## 仓库: {repo}\n{result.stdout}")
             except Exception as e:
                 print(f"  警告: 无法访问仓库 {repo}: {e}", file=sys.stderr)
-
     return '\n\n'.join(all_commits), '\n\n'.join(all_diffs)
 
 
 def load_prompt(base_file, role_file):
     """加载并合并提示词"""
     prompts_dir = Path(__file__).parent.parent / 'prompts'
-
     with open(prompts_dir / base_file, 'r', encoding='utf-8') as f:
         base = f.read()
-
     with open(prompts_dir / role_file, 'r', encoding='utf-8') as f:
         role = f.read()
-
     return f"{base}\n\n---\n\n{role}"
 
 
@@ -341,11 +318,8 @@ def call_ai(prompt, commits, diff, intern_name, role, provider, model, api_key):
         diff = diff[:max_diff] + f"\n\n... [diff 已截断，原始长度 {len(diff)} 字符] ..."
 
     full_prompt = f"""{prompt}
-
 ---
-
 ## 待审查数据
-
 ### 实习生：{intern_name}
 ### 岗位：{role}
 
@@ -403,7 +377,6 @@ def main():
     parser.add_argument('--repo-path', help='仓库本地路径（可选）')
     parser.add_argument('--dry-run', action='store_true', help='只输出 prompt，不调用 AI')
     parser.add_argument('--list-providers', action='store_true', help='列出所有支持的 provider')
-
     # 也支持手动传入数据（不从 Git 拉取）
     parser.add_argument('--commits-file', help='手动指定提交记录文件')
     parser.add_argument('--diff-file', help='手动指定 diff 文件')
@@ -419,6 +392,80 @@ def main():
             print(f"  {pid:15s} {pc['name']:25s} Key: {has_key}  {pc['description']}")
         print(f"\n环境变量: {', '.join(PROVIDERS[p]['env_key'] for p in PROVIDER_PRIORITY)}")
         return
+
+    # ==============================================
+    # ✅ 修复：DRY_RUN 模式放在最前面，跳过 API Key 检查
+    # ==============================================
+    if args.dry_run:
+        print("🔧 试运行模式：不调用 AI，只输出 Prompt")
+        print("   （无需配置 API Key）")
+
+        # 加载配置
+        config = load_config(args.config)
+        intern = find_intern(config, args.intern)
+        role = intern['role']
+
+        # 确定周次
+        if args.week:
+            week = args.week
+        else:
+            today = datetime.now()
+            week = f"{today.year}-W{today.isocalendar()[1]:02d}"
+
+        # 确定日期范围
+        if args.since:
+            since = args.since
+            until = (datetime.strptime(since, '%Y-%m-%d') + timedelta(days=6)).strftime('%Y-%m-%d')
+            print(f"📋 试运行: {args.intern} ({role}) | {since} ~ {until}")
+        else:
+            since, until = get_week_range(week)
+            print(f"📋 试运行: {args.intern} ({role}) | {week} ({since} ~ {until})")
+
+        # 加载提示词
+        prompt = load_prompt('_base-template.md', f'{role}-intern.md')
+
+        # 获取代码变更
+        if args.commits_file and args.diff_file:
+            with open(args.commits_file, 'r', encoding='utf-8') as f:
+                commits = f.read()
+            with open(args.diff_file, 'r', encoding='utf-8') as f:
+                diff = f.read()
+        else:
+            repo_path = Path(args.repo_path) if args.repo_path else None
+            commits, diff = fetch_commits(intern, since, until, repo_path)
+
+        print(f"  提交记录: {len(commits)} 字符")
+        print(f"  代码变更: {len(diff)} 字符")
+
+        # 输出完整 Prompt
+        max_diff = 50000
+        truncated_diff = diff[:max_diff] + f"\n\n... [diff 已截断] ..." if len(diff) > max_diff else diff
+        full_prompt = f"""{prompt}
+---
+## 待审查数据
+### 实习生：{args.intern}
+### 岗位：{role}
+
+### 本周提交记录
+{commits if commits else "（本周无提交记录）"}
+
+### 代码变更详情
+```
+{truncated_diff if truncated_diff else "（本周无代码变更）"}
+```
+
+请严格按照上方评审模板格式，输出完整的周度评审报告。
+"""
+        print("\n" + "=" * 60)
+        print("PROMPT (可复制到 AI 工具中):")
+        print("=" * 60)
+        print(full_prompt)
+        print("\n✅ 试运行完成！")
+        return
+
+    # ==============================================
+    # 以下是正常模式（需要 API Key）
+    # ==============================================
 
     # 确定 provider
     provider = args.provider
@@ -469,6 +516,7 @@ def main():
     else:
         since, until = get_week_range(week)
         print(f"📋 生成评审报告: {args.intern} ({role}) | {week} ({since} ~ {until})")
+
     print(f"  Provider: {pc['name']} | 模型: {model}")
 
     # 加载提示词
@@ -487,41 +535,11 @@ def main():
     print(f"  提交记录: {len(commits)} 字符")
     print(f"  代码变更: {len(diff)} 字符")
 
-    # dry-run 模式
-    if args.dry_run:
-        max_diff = 50000
-        truncated_diff = diff[:max_diff] + f"\n\n... [diff 已截断] ..." if len(diff) > max_diff else diff
-        full_prompt = f"""{prompt}
-
----
-
-## 待审查数据
-
-### 实习生：{args.intern}
-### 岗位：{role}
-
-### 本周提交记录
-{commits if commits else "（本周无提交记录）"}
-
-### 代码变更详情
-```
-{truncated_diff if truncated_diff else "（本周无代码变更）"}
-```
-
-请严格按照上方评审模板格式，输出完整的周度评审报告。
-"""
-        print("\n" + "=" * 60)
-        print("PROMPT (可复制到 AI 工具中):")
-        print("=" * 60)
-        print(full_prompt)
-        return
-
     # 调用 AI
     try:
         report = call_ai(prompt, commits, diff, args.intern, role, provider, model, api_key)
     except Exception as e:
         print(f"  ❌ AI 调用失败: {e}", file=sys.stderr)
-
         # 输出 prompt 到文件供手动使用
         max_diff = 50000
         truncated_diff = diff[:max_diff] + f"\n\n... [diff 已截断] ..." if len(diff) > max_diff else diff
