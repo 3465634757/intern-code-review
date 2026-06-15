@@ -1,36 +1,60 @@
-# 实习生名单与岗位映射
-# 修改此文件即可增减实习生，无需改代码
 interns:
-  - name: "Sebastian Beltran"
-    github_id: "Sebastian Beltran"    # ← 改成实际的 author name
-    role: "backend"
-    team: "Node.js"
-    mentor: "测试导师"
+  # ------------------------------
+  # 前端实习生 - 确保有近期提交
+  # ------------------------------
+  - name: "张前端"
+    github_id: "sindresorhus"           # ✅ 持续活跃提交
+    role: "frontend"
+    team: "前端架构组"
+    mentor: "李导师"
     repos:
-      - "3465634757/express"
-    branches: ["master"]
-    start_date: "2025-01-01"
+      - "sindresorhus/awesome"          # ✅ 持续更新
 
+  - name: "王Vue"
+    github_id: "yyx990803"              # ✅ Vue作者，近期在core仓库活跃
+    role: "frontend"
+    team: "前端框架组"
+    mentor: "张导师"
+    repos:
+      - "vuejs/core"                    # ⚠️ 优化：Vue 3 核心仓库（有近期提交）
 
+  # ------------------------------
+  # 后端实习生 - 持续活跃
+  # ------------------------------
+  - name: "李后端"
+    github_id: "tiangolo"               # ✅ FastAPI作者，每天都有提交
+    role: "backend"
+    team: "API服务组"
+    mentor: "王导师"
+    repos:
+      - "fastapi/fastapi"               # ✅ 非常活跃，每天都有PR
 
-  # # ---- 后端实习生 ----
-  # - name: "李四"
-  #   github_id: "tiangolo"              # FastAPI 作者，本周有提交
-  #   role: "backend"
-  #   team: "系统层"
-  #   mentor: "王导师"
-  #   repos:
-  #     - "fastapi/fastapi"              # Python Web 框架，本周有提交
-  #   branches: ["main"]
-  #   start_date: "2026-05-15"
+  - name: "赵Django"
+    github_id: "adamchainz"             # ✅ Django核心维护者
+    role: "backend"
+    team: "Python后端组"
+    mentor: "陈导师"
+    repos:
+      - "django/django"                 # ✅ 持续更新
 
-  # # ---- 测试实习生 ----
-  # - name: "王五"
-  #   github_id: "expressjs"             # Express 组织账号
-  #   role: "qa"
-  #   team: "质量保障"
-  #   mentor: "赵导师"
-  #   repos:
-  #     - "expressjs/express"            # Node.js Web 框架，本周有提交
-  #   branches: ["main"]
-  #   start_date: "2026-06-01"
+  # ------------------------------
+  # 测试实习生
+  # ------------------------------
+  - name: "刘测试"
+    github_id: "SimenB"                 # ✅ Jest核心维护者
+    role: "qa"
+    team: "质量保障组"
+    mentor: "周导师"
+    repos:
+      - "jestjs/jest"                   # ✅ 活跃维护
+
+  # ------------------------------
+  # 移动端实习生
+  # ------------------------------
+  - name: "陈移动端"
+    github_id: "cortinico"              # ✅ React Native核心贡献者
+    role: "mobile"
+    team: "移动端组"
+    mentor: "吴导师"
+    repos:
+      - "facebook/react-native"         # ✅ 持续开发
