@@ -8,10 +8,12 @@
 #   ./run.sh --since 2026-06-01 # 指定起始日期（自由时间段）
 #   ./run.sh --since 2026-06-01 --week 2026-W24  # 指定日期+周次归档名
 #   ./run.sh --dry-run          # 试运行（只收集数据，不调用AI）
-#   ./run.sh --provider deepseek # 指定 AI Provider
+#   ./run.sh --provider deepseek # 指定 AI Provider（默认 sfkey）
 #
 # 支持的 AI Provider（按优先级自动检测）:
 #   gemini        - Google Gemini（免费，推荐）
+#   sfkey         - SFKey OpenAI Compatible
+#   zai           - Z.AI GLM-5.1（OpenAI 兼容）
 #   deepseek      - DeepSeek（国内可用）
 #   siliconflow   - 硅基流动（国内平台）
 #   anthropic     - Claude（收费）
@@ -21,9 +23,10 @@
 #   1. pip install -r requirements.txt
 #   2. 设置环境变量（任选一个）:
 #      export GEMINI_API_KEY="your-key"       # 推荐
+#      export ZAI_API_KEY="your-key"       # SFKey / Z.AI
 #      export DEEPSEEK_API_KEY="your-key"
 #      export SILICONFLOW_API_KEY="your-key"
-#   3. 根据实际情况修改 config/interns.yml 中的仓库路径
+#   3. 默认仓库父目录为 /d/qt/repos，可用 --repo-base 覆盖
 
 set -euo pipefail
 
@@ -70,7 +73,10 @@ mkdir -p "$OUTPUT_DIR"
 
 # 检测可用的 AI Provider（国内无需翻墙的优先）
 if [ -z "$PROVIDER" ]; then
-    if [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+    if [ -n "${ZAI_API_KEY:-}" ]; then
+        PROVIDER="sfkey"
+        echo "🤖 自动选择 Provider: SFKey OpenAI Compatible（ZAI_API_KEY）"
+    elif [ -n "${DEEPSEEK_API_KEY:-}" ]; then
         PROVIDER="deepseek"
         echo "🤖 自动选择 Provider: DeepSeek（国内直连）"
     elif [ -n "${SILICONFLOW_API_KEY:-}" ]; then
@@ -89,6 +95,7 @@ if [ -z "$PROVIDER" ]; then
         echo "❌ 错误: 未检测到可用的 AI API Key"
         echo ""
         echo "请设置以下任一环境变量（推荐 DeepSeek，国内直连免费）:"
+        echo "  export ZAI_API_KEY=\"your-key\"           # SFKey / Z.AI"
         echo "  export DEEPSEEK_API_KEY=\"your-key\"      # https://platform.deepseek.com"
         echo "  export SILICONFLOW_API_KEY=\"your-key\"   # https://cloud.siliconflow.cn"
         echo "  export GEMINI_API_KEY=\"your-key\"        # https://aistudio.google.com/apikey（需翻墙）"
@@ -144,7 +151,7 @@ for NAME in $INTERNS; do
     fi
 
     if [ -n "$REPO_BASE" ]; then
-        CMD="$CMD --repo-base \"$REPO_BASE\""
+        CMD="$CMD --repo-path \"$REPO_BASE\""
     fi
 
     # 执行

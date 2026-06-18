@@ -72,10 +72,22 @@ PROVIDERS = {
         "default_model": "gpt-4o",
         "description": "收费，通用能力强",
     },
+    "zai": {
+        "name": "Z.AI GLM",
+        "env_key": "ZAI_API_KEY",
+        "default_model": "glm-5.1",
+        "description": "GLM-5.1，OpenAI 兼容接口",
+    },
+    "sfkey": {
+        "name": "SFKey OpenAI Compatible",
+        "env_key": "ZAI_API_KEY",
+        "default_model": "glm-5.1",
+        "description": "SFKey OpenAI 兼容接口（使用 ZAI_API_KEY）",
+    },
 }
 
 # Provider 优先级（自动检测时按此顺序尝试，国内无需翻墙的排前面）
-PROVIDER_PRIORITY = ["deepseek", "siliconflow", "gemini", "anthropic", "openai"]
+PROVIDER_PRIORITY = ["sfkey", "zai", "deepseek", "siliconflow", "gemini", "anthropic", "openai"]
 
 
 def detect_provider():
@@ -222,6 +234,42 @@ def call_openai(prompt, model, api_key):
         raise RuntimeError("请先安装 openai SDK: pip install openai")
 
 
+def call_zai(prompt, model, api_key):
+    """调用 Z.AI GLM API（兼容 OpenAI 格式）"""
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.z.ai/api/paas/v4/",
+        )
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except ImportError:
+        raise RuntimeError("请先安装 openai SDK: pip install openai")
+
+
+def call_sfkey(prompt, model, api_key):
+    """调用 SFKey OpenAI 兼容 API"""
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.sfkey.cn/v1/",
+        )
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except ImportError:
+        raise RuntimeError("请先安装 openai SDK: pip install openai")
+
+
 # Provider 调用映射
 PROVIDER_CALLERS = {
     "gemini": call_gemini,
@@ -229,6 +277,8 @@ PROVIDER_CALLERS = {
     "siliconflow": call_siliconflow,
     "anthropic": call_anthropic,
     "openai": call_openai,
+    "zai": call_zai,
+    "sfkey": call_sfkey,
 }
 
 
@@ -280,7 +330,7 @@ def fetch_commits(intern, since, until, repo_path=None):
                      f'--until={until}',
                      '--pretty=format:%h|%s|%ai|%an',
                      '--no-merges'],
-                    capture_output=True, text=True, cwd=str(repo_dir)
+                    capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=str(repo_dir)
                 )
                 if result.stdout.strip():
                     all_commits.append(f"## 仓库: {repo}\n{result.stdout}")
@@ -291,7 +341,7 @@ def fetch_commits(intern, since, until, repo_path=None):
                      f'--until={until}',
                      '--no-merges',
                      '-p', '--stat'],
-                    capture_output=True, text=True, cwd=str(repo_dir)
+                    capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=str(repo_dir)
                 )
                 if result.stdout.strip():
                     all_diffs.append(f"## 仓库: {repo}\n{result.stdout}")
@@ -372,9 +422,9 @@ def main():
     parser.add_argument('--week', help='审查周，格式: 2026-W24（默认本周）')
     parser.add_argument('--since', help='起始日期，格式: 2026-06-01（覆盖 week 计算的日期）')
     parser.add_argument('--output', '-o', help='输出文件路径')
-    parser.add_argument('--provider', help='AI provider（默认自动检测可用的）')
+    parser.add_argument('--provider', default='sfkey', help='AI provider（默认 sfkey）')
     parser.add_argument('--model', help='AI 模型（默认使用 provider 推荐模型）')
-    parser.add_argument('--repo-path', help='仓库本地路径（可选）')
+    parser.add_argument('--repo-path', default='D:/qt/repos', help='仓库本地路径（默认: D:/qt/repos）')
     parser.add_argument('--dry-run', action='store_true', help='只输出 prompt，不调用 AI')
     parser.add_argument('--list-providers', action='store_true', help='列出所有支持的 provider')
     # 也支持手动传入数据（不从 Git 拉取）
@@ -390,7 +440,8 @@ def main():
             pc = PROVIDERS[pid]
             has_key = "✅" if os.environ.get(pc["env_key"]) else "❌"
             print(f"  {pid:15s} {pc['name']:25s} Key: {has_key}  {pc['description']}")
-        print(f"\n环境变量: {', '.join(PROVIDERS[p]['env_key'] for p in PROVIDER_PRIORITY)}")
+        env_keys = list(dict.fromkeys(PROVIDERS[p]['env_key'] for p in PROVIDER_PRIORITY))
+        print(f"\n环境变量: {', '.join(env_keys)}")
         return
 
     # ==============================================

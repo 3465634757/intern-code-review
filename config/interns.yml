@@ -6,14 +6,21 @@ interns:
   # ------------------------------
   # 前端 - 绝对高频
   # ------------------------------
-  - name: "张React"
-    github_id: "eps1lon"               # ✅ React核心维护者，日均5+提交
-    role: "frontend"
-    team: "React框架组"
-    mentor: "李导师"
+  - name: "nieliguo"
+    github_id: "nieliguo"              
+    role: "backend"
+    team: "QuickCAE框架组"
+    mentor: "琪姐"
     repos:
-      - "facebook/react"               # 🔥 React仓库，日均几十提交
+      - "HeatPred"             
 
+  - name: "lt"
+    github_id: "lt"             
+    role: "backend"
+    team: "QuickCAE框架组"
+    mentor: "琪姐"
+    repos:
+      - "HeatPred"               
 # interns:
 #   # ------------------------------
 #   # 前端实习生 - 确保有近期提交

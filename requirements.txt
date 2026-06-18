@@ -1,7 +1,7 @@
 # Python 依赖
 #
 # 免费 Provider（推荐）
-google-genai>=1.0.0    # Google Gemini API（推荐首选，免费）
+#google-genai>=1.0.0    # Google Gemini API（推荐首选，免费）
 #
 # 兼容 OpenAI 格式的 Provider（DeepSeek / SiliconFlow）
 # 安装 openai SDK 后可同时支持 DeepSeek 和 SiliconFlow
